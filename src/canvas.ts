@@ -11,6 +11,9 @@ const {
   paddingX,
   hollowPath,
 } = settings;
+
+// Extra safety to avoid clipping on long right-side names
+const SAFE_EDGE_PADDING = 24;
 const font = `${fontSize}px RoGSanSrfStd-Bd, GlowSansSC-Normal-Heavy_diff, apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif`;
 
 export default class LogoCanvas {
@@ -171,38 +174,42 @@ export default class LogoCanvas {
     this.textWidthR =
       this.textMetricsR!.width +
       (textBaseLine * canvasHeight - this.textMetricsR!.fontBoundingBoxAscent) * horizontalTilt;
+
+    // add safe area for stroke + anti-aliasing + transform rounding
+    const leftNeed = Math.ceil(this.textWidthL + paddingX + SAFE_EDGE_PADDING);
+    const rightNeed = Math.ceil(this.textWidthR + paddingX + SAFE_EDGE_PADDING);
+
     //extend canvas
-    if (this.textWidthL + paddingX > canvasWidth / 2) {
-      this.canvasWidthL = this.textWidthL + paddingX;
-    } else {
-      this.canvasWidthL = canvasWidth / 2;
-    }
-    if (this.textWidthR + paddingX > canvasWidth / 2) {
-      this.canvasWidthR = this.textWidthR + paddingX;
-    } else {
-      this.canvasWidthR = canvasWidth / 2;
-    }
-    this.canvas.width = this.canvasWidthL + this.canvasWidthR;
+    this.canvasWidthL = Math.max(canvasWidth / 2, leftNeed);
+    this.canvasWidthR = Math.max(canvasWidth / 2, rightNeed);
+
+    this.canvas.width = Math.ceil(this.canvasWidthL + this.canvasWidthR);
   }
   generateImg() {
     let outputCanvas: HTMLCanvasElement;
     if (
-      this.textWidthL + paddingX < canvasWidth / 2 ||
-      this.textWidthR + paddingX < canvasWidth / 2
+      this.textWidthL + paddingX + SAFE_EDGE_PADDING < canvasWidth / 2 ||
+      this.textWidthR + paddingX + SAFE_EDGE_PADDING < canvasWidth / 2
     ) {
       outputCanvas = document.createElement('canvas');
-      outputCanvas.width = this.textWidthL + this.textWidthR + paddingX * 2;
+      const cropWidth = Math.ceil(
+        this.textWidthL + this.textWidthR + paddingX * 2 + SAFE_EDGE_PADDING * 2
+      );
+      outputCanvas.width = cropWidth;
       outputCanvas.height = this.canvas.height;
       const ctx = outputCanvas.getContext('2d')!;
+      const cropStartX = Math.floor(
+        this.canvasWidthL - this.textWidthL - paddingX - SAFE_EDGE_PADDING
+      );
       ctx.drawImage(
         this.canvas,
-        canvasWidth / 2 - this.textWidthL - paddingX,
+        cropStartX,
         0,
-        this.textWidthL + this.textWidthR + paddingX * 2,
+        cropWidth,
         this.canvas.height,
         0,
         0,
-        this.textWidthL + this.textWidthR + paddingX * 2,
+        cropWidth,
         this.canvas.height
       );
     } else {
